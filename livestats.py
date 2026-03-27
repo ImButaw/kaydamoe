@@ -314,7 +314,6 @@ def open_live_stats(parent, home_id, away_id, game_label, controlled_team_id=Non
                 rows.sort(key=lambda r: r["team_name"])
                 return [{"id": r["id"], "name": r["team_name"]} for r in rows]
             except Exception:
-                nonlocal use_remote
                 use_remote = False
 
         rows = conn.execute(
@@ -338,7 +337,6 @@ def open_live_stats(parent, home_id, away_id, game_label, controlled_team_id=Non
                     for r in rows
                 ]
             except Exception:
-                nonlocal use_remote
                 use_remote = False
 
         rows = conn.execute(
@@ -380,7 +378,6 @@ def open_live_stats(parent, home_id, away_id, game_label, controlled_team_id=Non
                 api_client.update_stat(gl, player_id, team_id, col, amount)
                 return
             except Exception:
-                nonlocal use_remote
                 use_remote = False
 
         conn.execute(
@@ -400,7 +397,6 @@ def open_live_stats(parent, home_id, away_id, game_label, controlled_team_id=Non
                 rows.sort(key=lambda r: r["player_id"])
                 return rows
             except Exception:
-                nonlocal use_remote
                 use_remote = False
 
         rows = conn.execute(f"""
