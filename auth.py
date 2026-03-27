@@ -1,5 +1,60 @@
 import customtkinter as ctk
 import api_client
+import hashlib
+import sqlite3
+import os
+
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "BSS.db")
+
+
+def _get_local_conn():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON;")
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS USERS (Username TEXT PRIMARY KEY, PasswordHash TEXT NOT NULL)"
+    )
+    conn.commit()
+    return conn
+
+
+def _hash_password(pw: str) -> str:
+    return hashlib.sha256(pw.encode("utf-8")).hexdigest()
+
+
+def local_login(username: str, password: str):
+    conn = _get_local_conn()
+    try:
+        row = conn.execute(
+            "SELECT PasswordHash FROM USERS WHERE Username=?",
+            (username,),
+        ).fetchone()
+        if not row:
+            raise Exception("User not found.")
+        if row["PasswordHash"] != _hash_password(password):
+            raise Exception("Wrong password.")
+        return True
+    finally:
+        conn.close()
+
+
+def local_signup(username: str, password: str):
+    conn = _get_local_conn()
+    try:
+        existing = conn.execute(
+            "SELECT 1 FROM USERS WHERE Username=?",
+            (username,),
+        ).fetchone()
+        if existing:
+            raise Exception("Username already exists.")
+        conn.execute(
+            "INSERT INTO USERS (Username, PasswordHash) VALUES (?,?)",
+            (username, _hash_password(password)),
+        )
+        conn.commit()
+        return True
+    finally:
+        conn.close()
 
 
 def _password_requirements(pw: str):
@@ -120,9 +175,9 @@ def open_auth(parent, on_success):
             msg_var.set("Username and password required.")
             return
         try:
-            api_client.login(u, p)
+            local_login(u, p)
         except Exception as e:
-            msg_var.set(str(e).replace("400: ", "").replace("401: ", ""))
+            msg_var.set(str(e))
             return
         msg_var.set("")
         try:
@@ -144,9 +199,9 @@ def open_auth(parent, on_success):
             requirements_var.set("Missing:\n- " + "\n- ".join(missing))
             return
         try:
-            api_client.signup(u, p)
+            local_signup(u, p)
         except Exception as e:
-            msg_var.set(str(e).replace("400: ", "").replace("401: ", ""))
+            msg_var.set(str(e))
             return
         msg_var.set("Account created. You can login now.")
         requirements_var.set("")
