@@ -4,6 +4,7 @@ import customtkinter as ctk
 from tkinter import filedialog
 import os
 
+import api_client
 from reportlab.lib.pagesizes import landscape, A4
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet
@@ -13,6 +14,15 @@ DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "BSS.db")
 
 
 def open_game_history(parent, prepared_by="Unknown"):
+    conn = None
+    use_remote = True
+    teams_cache = {}
+    try:
+        api_client.ping()
+        teams_cache = {t["id"]: t["team_name"] for t in api_client.get_teams()}
+    except Exception:
+        use_remote = False
+
     win = ctk.CTkToplevel(parent)
     win.title("Game History")
     win.geometry("1250x720")
@@ -74,6 +84,9 @@ def open_game_history(parent, prepared_by="Unknown"):
         return c
 
     def get_games():
+        if use_remote:
+            return api_client.get_games()
+
         c = conn()
         rows = c.execute("""
             SELECT GameID, GameLabel, HomeTeamID, AwayTeamID
@@ -84,12 +97,18 @@ def open_game_history(parent, prepared_by="Unknown"):
         return rows
 
     def team_name(team_id):
+        if use_remote:
+            return teams_cache.get(team_id, f"Team {team_id}")
+
         c = conn()
         r = c.execute("SELECT TeamName FROM TEAMS WHERE ID=?", (team_id,)).fetchone()
         c.close()
         return r["TeamName"] if r else f"Team {team_id}"
 
     def fetch_team_box(game_label, team_id):
+        if use_remote:
+            return api_client.get_stats(game_label, team_id)
+
         c = conn()
         rows = c.execute("""
             SELECT
