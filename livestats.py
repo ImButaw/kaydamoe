@@ -302,15 +302,20 @@ def open_live_stats(parent, home_id, away_id, game_label, controlled_team_id=Non
         log_box.configure(state="disabled")
 
     def fetch_teams():
+        nonlocal use_remote
         if use_remote:
-            rows = [
-                t for t in api_client.get_teams()
-                if t["id"] in {home_id, away_id}
-            ]
-            if controlled_team_id is not None:
-                rows = [t for t in rows if t["id"] == controlled_team_id]
-            rows.sort(key=lambda r: r["team_name"])
-            return [{"id": r["id"], "name": r["team_name"]} for r in rows]
+            try:
+                rows = [
+                    t for t in api_client.get_teams()
+                    if t["id"] in {home_id, away_id}
+                ]
+                if controlled_team_id is not None:
+                    rows = [t for t in rows if t["id"] == controlled_team_id]
+                rows.sort(key=lambda r: r["team_name"])
+                return [{"id": r["id"], "name": r["team_name"]} for r in rows]
+            except Exception:
+                nonlocal use_remote
+                use_remote = False
 
         rows = conn.execute(
             f"SELECT ID AS id, TeamName AS name FROM {TEAMS_TABLE} WHERE ID IN (?,?) ORDER BY TeamName",
@@ -319,17 +324,22 @@ def open_live_stats(parent, home_id, away_id, game_label, controlled_team_id=Non
         return [{"id": r["id"], "name": r["name"]} for r in rows]
 
     def fetch_players(team_id):
+        nonlocal use_remote
         if use_remote:
-            rows = api_client.get_players(team_id)
-            return [
-                {
-                    "id": r["id"],
-                    "jersey": r.get("jersey"),
-                    "first_name": r["first_name"],
-                    "last_name": r["last_name"],
-                }
-                for r in rows
-            ]
+            try:
+                rows = api_client.get_players(team_id)
+                return [
+                    {
+                        "id": r["id"],
+                        "jersey": r.get("jersey"),
+                        "first_name": r["first_name"],
+                        "last_name": r["last_name"],
+                    }
+                    for r in rows
+                ]
+            except Exception:
+                nonlocal use_remote
+                use_remote = False
 
         rows = conn.execute(
             f"""SELECT playerID AS id, Jersey AS jersey,
@@ -361,12 +371,17 @@ def open_live_stats(parent, home_id, away_id, game_label, controlled_team_id=Non
         conn.commit()
 
     def apply_delta(gl, player_id, team_id, col, amount):
+        nonlocal use_remote
         allowed = {"TwoPM","TwoPA","ThreePM","ThreePA","FTM","FTA","REB","AST","STL","BLK","TOV","PF"}
         if col not in allowed:
             return
         if use_remote:
-            api_client.update_stat(gl, player_id, team_id, col, amount)
-            return
+            try:
+                api_client.update_stat(gl, player_id, team_id, col, amount)
+                return
+            except Exception:
+                nonlocal use_remote
+                use_remote = False
 
         conn.execute(
             f"UPDATE {STATS_TABLE} SET {col}=MAX(COALESCE({col},0)+?,0) WHERE GameLabel=? AND PlayerID=?",
@@ -378,10 +393,15 @@ def open_live_stats(parent, home_id, away_id, game_label, controlled_team_id=Non
         return f"{(made/att)*100:.0f}%" if att else "â€”"
 
     def query_box(gl, team_id):
+        nonlocal use_remote
         if use_remote:
-            rows = api_client.get_stats(gl, team_id)
-            rows.sort(key=lambda r: r["player_id"])
-            return rows
+            try:
+                rows = api_client.get_stats(gl, team_id)
+                rows.sort(key=lambda r: r["player_id"])
+                return rows
+            except Exception:
+                nonlocal use_remote
+                use_remote = False
 
         rows = conn.execute(f"""
             SELECT p.playerID AS player_id, p.Jersey AS jersey,

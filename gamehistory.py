@@ -84,8 +84,12 @@ def open_game_history(parent, prepared_by="Unknown"):
         return c
 
     def get_games():
+        nonlocal use_remote
         if use_remote:
-            return api_client.get_games()
+            try:
+                return api_client.get_games()
+            except Exception:
+                use_remote = False
 
         c = conn()
         rows = c.execute("""
@@ -97,8 +101,17 @@ def open_game_history(parent, prepared_by="Unknown"):
         return rows
 
     def team_name(team_id):
+        nonlocal use_remote
         if use_remote:
-            return teams_cache.get(team_id, f"Team {team_id}")
+            name = teams_cache.get(team_id)
+            if name is not None:
+                return name
+            try:
+                teams = api_client.get_teams()
+                teams_cache.update({t["id"]: t["team_name"] for t in teams})
+                return teams_cache.get(team_id, f"Team {team_id}")
+            except Exception:
+                use_remote = False
 
         c = conn()
         r = c.execute("SELECT TeamName FROM TEAMS WHERE ID=?", (team_id,)).fetchone()
@@ -106,8 +119,12 @@ def open_game_history(parent, prepared_by="Unknown"):
         return r["TeamName"] if r else f"Team {team_id}"
 
     def fetch_team_box(game_label, team_id):
+        nonlocal use_remote
         if use_remote:
-            return api_client.get_stats(game_label, team_id)
+            try:
+                return api_client.get_stats(game_label, team_id)
+            except Exception:
+                use_remote = False
 
         c = conn()
         rows = c.execute("""
