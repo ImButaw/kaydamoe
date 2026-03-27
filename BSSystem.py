@@ -236,6 +236,17 @@ def open_join_game():
         messagebox.showinfo("No Games", "No games yet. Ask the host to start a game first.")
         return
 
+    normalized_games = []
+    for g in games:
+        game = dict(g)
+        game["game_label"] = game.get("game_label") or game.get("GameLabel")
+        game["home_team_id"] = game.get("home_team_id") or game.get("HomeTeamID")
+        game["away_team_id"] = game.get("away_team_id") or game.get("AwayTeamID")
+        game["home_name"] = game.get("home_name") or game.get("HomeName")
+        game["away_name"] = game.get("away_name") or game.get("AwayName")
+        normalized_games.append(game)
+    games = normalized_games
+
     pop = CTkToplevel(mainmenu)
     pop.title("Join Game")
     pop.geometry("480x360")
