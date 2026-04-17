@@ -179,7 +179,7 @@ def open_live_stats(parent, home_id, away_id, game_label, controlled_team_id=Non
     sub_btn.grid(row=0, column=0, sticky="ew", pady=3)
 
     undo_btn = ctk.CTkButton(
-        action_frame, text="â†©  UNDO LAST", height=38, corner_radius=10,
+        action_frame, text="â†©  UNDO", height=38, corner_radius=10,
         fg_color=SURFACE3, hover_color=SURFACE4,
         text_color=SUBTEXT, border_width=1, border_color=BORDER2,
         font=ctk.CTkFont(family=FONT_HEAD, size=12))
@@ -293,8 +293,8 @@ def open_live_stats(parent, home_id, away_id, game_label, controlled_team_id=Non
     state = {"team_id": None, "team_name": "", "player_id": None, "player_name": ""}
     active_ids = {"ids": []}
     action_stack = []
-
-    # â”€â”€ HELPERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    undo_mode = {"active": False}
+    # ─── HELPERS ───────────────────────────────────────────────────────────
     def add_log(text):
         log_box.configure(state="normal")
         log_box.insert("end", text + "\n")
@@ -809,6 +809,11 @@ def open_live_stats(parent, home_id, away_id, game_label, controlled_team_id=Non
             add_log("âš  You can only update your assigned team.")
             return
         gl = game_label_now()
+        
+        # Reverse deltas if in undo mode
+        if undo_mode["active"]:
+            deltas = [(col, -amt) for col, amt in deltas]
+        
         try:
             ensure_stat_row(gl, state["player_id"], state["team_id"])
             for col, amt in deltas:
@@ -828,24 +833,26 @@ def open_live_stats(parent, home_id, away_id, game_label, controlled_team_id=Non
                 sel_pts_var.set(f"{pts} PTS")
         except:
             pass
-        add_log(f"âœ“ {name}: {state['player_name']}")
+        if undo_mode["active"]:
+            add_log(f"↩ UNDO {name}: {state['player_name']}")
+        else:
+            add_log(f"✓ {name}: {state['player_name']}")
         refresh_right_panel()
 
-    def undo_last():
-        if not action_stack:
-            add_log("Nothing to undo.")
-            return
-        last = action_stack.pop()
-        try:
-            for col, amt in last["deltas"]:
-                apply_delta(last["gl"], last["player_id"], last["team_id"], col, -amt)
-        except Exception as e:
-            add_log(f"âš  Undo failed: {e}")
-            return
-        add_log(f"â†© UNDO: {last['player_name']}")
-        refresh_right_panel()
+    def toggle_undo_mode():
+        undo_mode["active"] = not undo_mode["active"]
+        if undo_mode["active"]:
+            undo_btn.configure(
+                fg_color=RED_DIM, text_color=RED_C, border_color=RED_C,
+                text="↩  UNDO MODE ON")
+            add_log("UNDO MODE ACTIVATED - Actions will now undo")
+        else:
+            undo_btn.configure(
+                fg_color=SURFACE3, text_color=SUBTEXT, border_color=BORDER2,
+                text="↩  UNDO")
+            add_log("Undo mode deactivated - Back to normal actions")
 
-    undo_btn.configure(command=undo_last)
+    undo_btn.configure(command=toggle_undo_mode)
     finish_btn.configure(command=lambda: on_close())
 
     stat_btn(btns_outer, "2PT MADE", "+2 pts",  lambda: do_action("2PT MADE", [("TwoPM",1),("TwoPA",1)]), 0, 0, highlight=True)
